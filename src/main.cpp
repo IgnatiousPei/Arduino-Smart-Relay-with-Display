@@ -8,7 +8,7 @@
 
 MIT License
 
-Copyright (c) 2021 Ashween Ignatious Peiris
+Copyright (c) 2022 Ashween Ignatious Peiris
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1283,7 +1283,7 @@ void handle_time_alarms()
         if (ON_times_s[i].toInt() == now_int)
         {
           // SWITCH ON THE RELAY
-          digitalWrite(OUT_relay_pin, LOW);
+          digitalWrite(OUT_relay_pin, HIGH);
 
           //Serial.print("Alarm ");
           //Serial.print(i + 1);
@@ -1293,7 +1293,7 @@ void handle_time_alarms()
         {
 
           // SWITCH OFF THE RELAY
-          digitalWrite(OUT_relay_pin, HIGH);
+          digitalWrite(OUT_relay_pin, LOW);
 
           //Serial.print("Alarm ");
           //Serial.print(i + 1);
@@ -1625,13 +1625,13 @@ void handle_volt_alarm(int volt_measured)
   if (volt_measured <= ON_volt)
   {
     //Close the relay contacts to charge the battery
-    digitalWrite(OUT_relay_pin, LOW);
+    digitalWrite(OUT_relay_pin, HIGH);
   }
   //(battery has finished charging)
   else if (volt_measured >= OFF_volt)
   {
     //Open the relay contacts to stop charging the battery
-    digitalWrite(OUT_relay_pin, HIGH);
+    digitalWrite(OUT_relay_pin, LOW);
   }
   else if (ON_volt < volt_measured && volt_measured < OFF_volt)
   {
@@ -1677,7 +1677,6 @@ void view_datetime()
 }
 
 //+ Allows the user to set the date and time
-
 void set_datetime()
 {
   // Setting flag to show variables are in memory that need cleaning
