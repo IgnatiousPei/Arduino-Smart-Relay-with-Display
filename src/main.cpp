@@ -52,6 +52,7 @@ const int IN_back_btn_pin = 6;
 /* Pin setup for the I2C LCD display */
 // Setting the address of the LCD diplay as 0x27
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+
 // the number of the LED pin so it can be dimmed through PWM
 const int OUT_led_pin = 11;
 
@@ -80,6 +81,13 @@ int reset_volt_alarm_state = 0;
 // set datetime state variables
 int view_datetime_state = 0;
 int set_datetime_state = 0;
+
+/* STATE VARIABLES FOR THE MAIN FSM */
+// state of the FSM
+int state = 0;
+
+// a flag to indicate temporary values in memory that are to be deleted
+int need_clean = 0;
 
 /* 
 
@@ -242,8 +250,6 @@ int al_num = 0;
 
 
 */
-int state = 0;
-int need_clean = 0;
 
 /* FUNCTION DECLARATIONS */
 
@@ -294,6 +300,7 @@ int handle_button_inputs(int up_st, int dn_st, int lt_st, int rt_st, int ok_st, 
 //+ Reset voltage temporary variables
 void reset_temp_volt_variables()
 {
+  // calculating the length by dividing the size of the array by one of its units
   int length_of_volt_temps = sizeof(volt_on_temp) / sizeof(volt_on_temp[0]);
 
   volt_off_temp_s = "00.0";
@@ -309,6 +316,7 @@ void reset_temp_volt_variables()
 //+ Reset time temporary variables
 void reset_temp_time_variables()
 {
+  // calculating the length by dividing the size of the array by one of its units
   int length_of_time_temps = sizeof(time_on_temp) / sizeof(time_on_temp[0]);
 
   time_off_temp_s = "0000";
@@ -338,7 +346,6 @@ int handle_time_entry(int cursorPos, int *ptime)
    e.g. 13:45 (1:45 pm) is represented as 1345
     */
 
-  // int currentDigit = time[cursorPos];
   int currentDigit = *(ptime + cursorPos);
   // if the UP switch is pressed
   if (up.rose())
@@ -352,7 +359,6 @@ int handle_time_entry(int cursorPos, int *ptime)
         currentDigit += 1;
       }
       // cap the second digit within 24 hrs
-      // else if (currentDigit < 2 && time[1] <= 3)
       else if (currentDigit < 2 && *(ptime + 1) <= 3)
       {
         currentDigit += 1;
@@ -645,18 +651,6 @@ int measure_voltage()
   // multiplies the calculated voltage by 1000 to get the first 3 digits
   formatted_voltage = int(calculated_voltage * 10);
 
-  /* Serial.print("Average measured value:");
-  //Serial.println(average_measured_value);
-
-  //Serial.print("Valid :");
-  //Serial.println(valid_samples);
-
-  //Serial.print("Calculated voltage:");
-  //Serial.println(calculated_voltage);
-  //Serial.print("Returned voltage:");
-  //Serial.println(formatted_voltage);
-  Serial.println("\n\n\n\n\n\n\n"); */
-
   return formatted_voltage;
 }
 
@@ -868,7 +862,10 @@ void view_time_alarms()
   if (view_time_alarm_state == 1)
   {
 
-    if (rt.rose() && al_num < int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1))
+    // calculates the length of the string temporary time variables and stores it
+    static int index_last = int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1);
+
+    if (rt.rose() && al_num < index_last)
     {
       al_num += 1;
 
@@ -905,7 +902,10 @@ void set_time_alarm()
   {
     al_num = 0;
 
-    for (size_t i = 0; i < ((sizeof(time_on_temp)) / (sizeof(time_on_temp[0])) - 1); i++)
+    // calculates the length of the temporary time variables and stores it
+    static int index_last = int((sizeof(time_on_temp)) / (sizeof(time_on_temp[0])) - 1);
+
+    for (int8_t i = 0; i < index_last; i++)
     {
       time_on_temp[i] = 0;
       time_off_temp[i] = 0;
@@ -928,8 +928,12 @@ void set_time_alarm()
   // This is the select alarm screen
   if (set_time_alarm_state == 4)
   {
+
+    // calculates the length of the string arrays that store time ON and time OFF variables and stores it
+    static int index_last = int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1);
+
     // increment/decrement the selected alarm number
-    if (rt.rose() && al_num < int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1))
+    if (rt.rose() && al_num < index_last)
     {
       al_num += 1;
       lcd.clear();
@@ -1140,18 +1144,6 @@ void set_time_alarm()
       EEPROM.put(ee_off_address, ee_off);
       EEPROM.put(ee_set_address, ee_active);
 
-      //Serial.print("Saved ");
-      //Serial.print(time_on_temp_s);
-      //Serial.print(" to EEPROM\n");
-
-      //Serial.print("Saved ");
-      //Serial.print(time_off_temp_s);
-      //Serial.print(" to EEPROM\n");
-
-      //Serial.print("Saved alarm ");
-      //Serial.print(temp_time_alarm_num + 1);
-      //Serial.print(" state to EEPROM\n");
-
       reset_temp_time_variables();
       // switching to the next state
       set_time_alarm_state = 13;
@@ -1192,8 +1184,10 @@ void reset_time_alarm()
   // The first alarm is shown
   if (reset_time_alarm_state == 1)
   {
+    // calculates the value of the index of the last alarm
+    static int index_of_last_alarm = int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1);
 
-    if (rt.rose() && al_num < int((sizeof(ON_times_s)) / (sizeof(ON_times_s[0])) - 1))
+    if (rt.rose() && al_num < index_of_last_alarm)
     {
       al_num += 1;
 
@@ -1284,20 +1278,12 @@ void handle_time_alarms()
         {
           // SWITCH ON THE RELAY
           digitalWrite(OUT_relay_pin, HIGH);
-
-          //Serial.print("Alarm ");
-          //Serial.print(i + 1);
-          //Serial.print(" activated\n");
         }
         else if (OFF_times_s[i].toInt() == now_int)
         {
 
           // SWITCH OFF THE RELAY
           digitalWrite(OUT_relay_pin, LOW);
-
-          //Serial.print("Alarm ");
-          //Serial.print(i + 1);
-          //Serial.print(" deactivated\n");
         }
       }
     }
@@ -1331,11 +1317,6 @@ void view_volt_alarm()
     lcd.setCursor(0, 1);
     lcd.print(F("Voltage now:"));
     lcd.print(voltage / 10.0);
-
-    if (bc.rose())
-    {
-      //TODO: return to the earlier menu
-    }
   }
 }
 
@@ -1358,8 +1339,11 @@ void set_voltage_alarm()
     lcd.setCursor(0, 0);
     lcd.print(F("Press OK to continue"));
 
+    // variable to store the maximum index of the variables
+    static int max_index = int((sizeof(volt_on_temp)) / (sizeof(volt_on_temp[0])) - 1);
+
     // clearing the temporary integer voltage values
-    for (size_t i = 0; i < ((sizeof(volt_on_temp)) / (sizeof(volt_on_temp[0])) - 1); i++)
+    for (int8_t i = 0; i < max_index; i++)
     {
       volt_on_temp[i] = 0;
       volt_off_temp[i] = 0;
@@ -1545,14 +1529,8 @@ void set_voltage_alarm()
       ON_volt_s = volt_on_temp_s;
       OFF_volt_s = volt_off_temp_s;
 
-      // ON_volt = volt_on_temp_s.toInt() * 10;
-      // OFF_volt = volt_off_temp_s.toInt() * 10;
       ON_volt = int(volt_on_temp_s.toFloat() * 10);
-
       OFF_volt = int(volt_off_temp_s.toFloat() * 10);
-
-      //Serial.println(ON_volt);
-      //Serial.println(OFF_volt);
 
       // Setting the local persistant stored variables
       for (int i; i < 4; i++)
@@ -1565,20 +1543,9 @@ void set_voltage_alarm()
 
       //! Saving the time to EEPROM
       // Pushing to EEPROM
-
       EEPROM.put(ee_volts_on_address, ee_volts_on);
       EEPROM.put(ee_volts_off_address, ee_volts_off);
       EEPROM.put(ee_volts_set_address, ee_volts_active);
-
-      //Serial.print("Saved ");
-      //Serial.print(volt_on_temp_s);
-      //Serial.print(" to EEPROM\n");
-
-      //Serial.print("Saved ");
-      //Serial.print(volt_off_temp_s);
-      //Serial.print(" to EEPROM\n");
-
-      //Serial.println("Saved voltage alarm to EEPROM");
 
       reset_temp_volt_variables();
 
@@ -1621,6 +1588,9 @@ void set_voltage_alarm()
 //needs to be delayed after running to prevent flickering of relay
 void handle_volt_alarm(int volt_measured)
 {
+  /* The logic level for switching are inverted in this relay module;
+  so HIGH turns OFF the relay and LOW makes it switch to ON. */
+
   //(to charge the battery))
   if (volt_measured <= ON_volt)
   {
@@ -1635,11 +1605,9 @@ void handle_volt_alarm(int volt_measured)
   }
   else if (ON_volt < volt_measured && volt_measured < OFF_volt)
   {
-    // Close the relay to charge the battery
-    // do nothing
+    // DO NOTHING
+    // Let the relay remain in its state until one of the switching conditions are met
   }
-  // Serial.println(ON_volt);
-  // Serial.println(OFF_volt);
 }
 
 // * Datetime section
@@ -1811,17 +1779,6 @@ void set_datetime()
       newhour = date_time_temp[11] * 10 + date_time_temp[12];
       newminute = date_time_temp[14] * 10 + date_time_temp[15];
 
-      /* Serial.print("New year:");
-      Serial.println(newyear);
-      Serial.print("New month:");
-      Serial.println(newmonth);
-      Serial.print("New day:");
-      Serial.println(newday);
-      Serial.print("New hour:");
-      Serial.println(newhour);
-      Serial.print("New minute:");
-      Serial.println(newminute); */
-
       DateTime newDate = DateTime(newyear, newmonth, newday, newhour, newminute);
       if (newDate.isValid())
       {
@@ -1911,7 +1868,6 @@ int handle_states(int curr)
 
     // HOME -> TIME_ALARMS_MENU
   case 1:
-    //next_state = handle_inputs_to_states(2, 2, curr, curr, 3, curr);
     next_state = handle_button_inputs(curr, 2, curr, curr, 3, curr, curr);
 
     if (next_state != curr)
@@ -1921,7 +1877,6 @@ int handle_states(int curr)
 
   // HOME -> VOLT_ALARM_MENU
   case 2:
-    //next_state = handle_inputs_to_states(1, 1, curr, curr, 4, curr);
     next_state = handle_button_inputs(1, 13, curr, curr, 4, curr, curr);
 
     if (next_state != curr)
@@ -1931,7 +1886,6 @@ int handle_states(int curr)
 
     // TIME_ALARMS_MENU -> VIEW_TIME_ALARMS_MENU
   case 3:
-    //next_state = handle_inputs_to_states(curr, 5, curr, curr, 7, curr);
     next_state = handle_button_inputs(curr, 5, curr, curr, 7, 1, curr);
 
     if (next_state != curr)
@@ -1952,7 +1906,6 @@ int handle_states(int curr)
   // TIME_ALARMS_MENU -> SET_TIME_ALARMS_MENU
   case 5:
 
-    //next_state = handle_inputs_to_states(3, 6, curr, curr, 8, curr);
     next_state = handle_button_inputs(3, 6, curr, curr, 8, 1, curr);
 
     if (next_state != curr)
@@ -1963,7 +1916,6 @@ int handle_states(int curr)
   // TIME_ALARMS_MENU -> RESET_TIME_ALARMS_MENU
   case 6:
 
-    //next_state = handle_inputs_to_states(5, curr, curr, curr, curr, curr);
     next_state = handle_button_inputs(5, curr, curr, curr, 9, 1, curr);
 
     if (next_state != curr)
